@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CrowdSky Bot</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <h1>🔭 CrowdSky&nbsp;Bot</h1>
+  <span id="clock" class="muted"></span>
+</header>
+
+<main>
+  <!-- ============ Setup & Credentials ============ -->
+  <section>
+    <h2>Setup &amp; Credentials</h2>
+    <div class="grid">
+      <label>Number of Seestars
+        <input type="number" id="cfg-scopes-count" min="0"
+               value="{{ config.scopes.count }}">
+        <small class="muted">0 = auto-discover</small>
+      </label>
+      <label>CrowdSky username
+        <input type="text" id="cfg-username" value="{{ config.crowdsky.username }}">
+      </label>
+      <label>CrowdSky password
+        <input type="password" id="cfg-password"
+               value="{{ config.crowdsky.password }}">
+      </label>
+    </div>
+
+    <h3>Location &amp; timezone</h3>
+    <div class="grid">
+      <label>Source
+        <select id="cfg-loc-source">
+          <option value="seestar" {{ 'selected' if config.location.source == 'seestar' }}>Auto (from Seestar)</option>
+          <option value="manual"  {{ 'selected' if config.location.source == 'manual' }}>Manual</option>
+        </select>
+      </label>
+      <label>Latitude
+        <input type="number" step="any" id="cfg-lat" value="{{ config.location.lat }}">
+      </label>
+      <label>Longitude
+        <input type="number" step="any" id="cfg-lon" value="{{ config.location.lon }}">
+      </label>
+      <label>Timezone (IANA)
+        <input type="text" id="cfg-tz" value="{{ config.location.timezone }}"
+               placeholder="e.g. Europe/Vienna">
+      </label>
+    </div>
+    <p class="muted" id="loc-detected">
+      Detected: {{ location.lat }}, {{ location.lon }} — {{ location.timezone or 'tz unknown' }}
+    </p>
+
+    <h3>Schedule</h3>
+    <div class="grid">
+      <label class="check"><input type="checkbox" id="cfg-auto-stack"
+        {{ 'checked' if config.schedule.auto_stack }}> Auto-stack at dawn</label>
+      <label class="check"><input type="checkbox" id="cfg-auto-upload"
+        {{ 'checked' if config.schedule.auto_upload }}> Auto-upload to CrowdSky</label>
+      <label>Trigger
+        <select id="cfg-trigger">
+          <option value="sunrise"    {{ 'selected' if config.schedule.trigger == 'sunrise' }}>Sunrise + offset</option>
+          <option value="astro_dawn" {{ 'selected' if config.schedule.trigger == 'astro_dawn' }}>Astronomical dawn + offset</option>
+          <option value="fixed"      {{ 'selected' if config.schedule.trigger == 'fixed' }}>Fixed time</option>
+        </select>
+      </label>
+      <label>Offset (min)
+        <input type="number" id="cfg-offset" value="{{ config.schedule.offset_minutes }}">
+      </label>
+      <label>Fixed time
+        <input type="time" id="cfg-fixed" value="{{ config.schedule.fixed_time }}">
+      </label>
+    </div>
+    <button id="save-config" class="primary">Save settings</button>
+    <span id="save-status" class="muted"></span>
+  </section>
+
+  <!-- ============ CrowdSky Stacks ============ -->
+  <section>
+    <h2>CrowdSky Stacks</h2>
+
+    <div id="status-strip" class="strip">
+      <div><strong>Status:</strong> <span id="status-state">idle</span>
+        <span id="status-msg" class="muted"></span></div>
+      <div id="status-scopes" class="muted"></div>
+      <div id="status-last" class="muted"></div>
+    </div>
+
+    <div class="controls">
+      <button id="btn-refresh">Refresh</button>
+      <button id="btn-stack" class="primary">Trigger stacking</button>
+      <button id="btn-upload" class="primary">Trigger upload</button>
+      <button id="btn-purge" class="danger">Purge CrowdSky stacks from Seestar</button>
+      <span class="muted">Actions apply to checked rows, or all if none checked.</span>
+    </div>
+
+    <table id="summary">
+      <thead>
+        <tr>
+          <th></th><th>Scope</th><th>Target</th>
+          <th># on CrowdSky server</th>
+          <th># stacked, awaiting upload</th>
+          <th># raws awaiting stacking</th>
+        </tr>
+      </thead>
+      <tbody id="summary-body">
+        <tr><td colspan="6" class="muted">Loading…</td></tr>
+      </tbody>
+    </table>
+    <p class="muted">Last refreshed: <span id="last-refreshed">never</span></p>
+  </section>
+
+  <!-- ============ View Stacks ============ -->
+  <section>
+    <h2>View Stacks</h2>
+    <label>Target
+      <select id="gallery-select"><option value="">—</option></select>
+    </label>
+    <div id="gallery" class="gallery"></div>
+  </section>
+</main>
+
+<script>window.CROWDSKY = {};</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
