@@ -15,26 +15,65 @@ import time
 log = logging.getLogger(__name__)
 
 
+def _valid_scopes(available: dict) -> list[dict]:
+    """Scopes from AVAILABLE_IPS, dropping the AP-hotspot fallback (10.0.0.1)."""
+    seen = set()
+    out = []
+    for host, ip in available.items():
+        if not ip or ip == "10.0.0.1" or ip in seen:
+            continue
+        seen.add(ip)
+        out.append({"ip": ip, "hostname": host})
+    out.sort(key=lambda s: s["hostname"])
+    return out
+
+
 def discover(cfg) -> list[dict]:
     """Discover Seestars on the LAN via mDNS.
 
     Probes ``seestar.local``, ``seestar-2.local`` … up to ``scopes.count`` (or
-    ``scopes.max_probe`` when count is 0 / auto). Returns a sorted list of
-    ``{"ip", "hostname"}`` dicts for the scopes that resolved.
+    ``scopes.max_probe`` when count is 0 / auto). mDNS resolution is flaky under
+    a short deadline, so we retry a few times with a generous timeout and union
+    the results (``find_available_ips`` accumulates into ``AVAILABLE_IPS``).
+    Returns a sorted list of ``{"ip", "hostname"}`` dicts.
     """
     from seestarpy import connection as conn
 
     count = int(cfg.get("scopes.count") or 0)
     n = count if count > 0 else int(cfg.get("scopes.max_probe") or 8)
-    conn.find_available_ips(n)
-    scopes = [
-        {"ip": ip, "hostname": host}
-        for host, ip in conn.AVAILABLE_IPS.items()
-    ]
-    scopes.sort(key=lambda s: s["hostname"])
+    timeout = float(cfg.get("scopes.discover_timeout", 5))
+    attempts = int(cfg.get("scopes.discover_attempts", 3))
+
+    scopes: list[dict] = []
+    prev = -1
+    for i in range(max(1, attempts)):
+        conn.find_available_ips(n, timeout=timeout)
+        scopes = _valid_scopes(conn.AVAILABLE_IPS)
+        if count > 0 and len(scopes) >= count:
+            break
+        # Auto mode: stop once the count stabilises across two passes.
+        if count == 0 and i >= 1 and len(scopes) == prev:
+            break
+        prev = len(scopes)
+        if i + 1 < attempts:
+            log.info("Discovery pass %d found %d scope(s); retrying…",
+                     i + 1, len(scopes))
+
     log.info("Discovered %d scope(s): %s", len(scopes),
              ", ".join(f"{s['hostname']}={s['ip']}" for s in scopes))
     return scopes
+
+
+def format_scope_label(meta: dict, ip: str) -> str:
+    """Human label: '<sn last 3> <model> (.<last IP octet>)', e.g. '936 S50 (.81)'."""
+    sn = (meta.get("sn") or "")
+    sn3 = sn[-3:] if sn else "???"
+    model = (meta.get("model") or "").replace("Seestar", "").strip()
+    octet = ip.split(".")[-1]
+    label = sn3
+    if model:
+        label += f" {model}"
+    return f"{label} (.{octet})"
 
 
 def scope_metadata(ip: str) -> dict:

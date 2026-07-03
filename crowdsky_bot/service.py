@@ -4,9 +4,9 @@ background threads, and serve the web app (DESIGN.md §4)."""
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
+from . import jobs as jobs_mod
 from . import scopes as scopes_mod
 from .cache import Cache
 from .config import Config, load_config
@@ -36,15 +36,7 @@ def _db_path(cfg: Config) -> Path:
 
 
 def _apply_crowdsky_config(cfg: Config) -> None:
-    from seestarpy import connection, crowdsky
-    connection.VERBOSE_LEVEL = 0
-    crowdsky.set_base_url(cfg.get("crowdsky.base_url"))
-    user = cfg.get("crowdsky.username")
-    pw = cfg.get("crowdsky.password")
-    if user and pw:
-        crowdsky.set_credentials(user, pw)
-        os.environ["CROWDSKY_USERNAME"] = user
-        os.environ["CROWDSKY_PASSWORD"] = pw
+    jobs_mod.apply_credentials(cfg)
 
 
 def refresh_scopes(ctx: Context) -> None:
@@ -61,8 +53,11 @@ def refresh_scopes(ctx: Context) -> None:
     for s in scopes:
         meta = scopes_mod.scope_metadata(s["ip"])
         s.update(meta)
+        custom = (cfg.get("scopes.names") or {}).get(s["ip"])
+        label = custom or scopes_mod.format_scope_label(meta, s["ip"])
+        s["name"] = label
         ctx.cache.upsert_scope(
-            ip=s["ip"], hostname=s["hostname"], name=cfg.scope_name(s["ip"]),
+            ip=s["ip"], hostname=s["hostname"], name=label,
             firmware=meta.get("firmware", ""),
             lon=location.get("lon"), lat=location.get("lat"),
         )

@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import fnmatch
 import logging
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
-from seestarpy import crowdsky, data, raw
+from seestarpy import connection, crowdsky, data, raw
 from seestarpy.crowdsky import server as cs_server
 
 from . import storage
@@ -22,6 +23,29 @@ from . import storage
 log = logging.getLogger(__name__)
 
 _ALL = (None, "all", ["all"])
+
+
+def apply_credentials(cfg) -> bool:
+    """Push CrowdSky base URL + credentials into seestarpy's module globals.
+
+    ``crowdsky.list_stacks`` / ``upload_stack`` read the username/password from
+    the ``crowdsky.server`` module (set via ``set_credentials``), NOT from our
+    config. This must be called whenever the config changes and before any job
+    that hits the server, otherwise seestarpy raises "credentials not set".
+    Returns True if credentials were present and applied.
+    """
+    connection.VERBOSE_LEVEL = 0
+    base = cfg.get("crowdsky.base_url")
+    if base:
+        crowdsky.set_base_url(base)
+    user = cfg.get("crowdsky.username")
+    pw = cfg.get("crowdsky.password")
+    if user and pw:
+        crowdsky.set_credentials(user, pw)
+        os.environ["CROWDSKY_USERNAME"] = user
+        os.environ["CROWDSKY_PASSWORD"] = pw
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +121,7 @@ def _resolve_targets(ip, targets, cfg, require_raw=False) -> list[str]:
 # refresh
 # ---------------------------------------------------------------------------
 def refresh(cfg, cache, progress, scope_ips, dry_run=False) -> dict:
+    apply_credentials(cfg)
     patterns = cfg.exclude_patterns
     block_minutes = int(cfg.get("stacking.block_minutes", 15))
     min_exptime = float(cfg.get("stacking.min_exptime", 240))
@@ -210,6 +235,7 @@ def stack(cfg, cache, progress, scope_ips, targets, dry_run=False) -> dict:
 # upload (parallel across scopes) + retention
 # ---------------------------------------------------------------------------
 def upload(cfg, cache, progress, scope_ips, targets, dry_run=False) -> dict:
+    apply_credentials(cfg)
     stacks_dir = cfg.stacks_dir
 
     def do_scope(ip: str) -> dict:

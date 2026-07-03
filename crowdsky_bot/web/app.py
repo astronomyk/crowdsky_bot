@@ -53,7 +53,7 @@ def create_app(ctx) -> Flask:
             "progress": prog,
             "scopes": [
                 {"ip": s["ip"], "hostname": s.get("hostname"),
-                 "name": ctx.cfg.scope_name(s["ip"]),
+                 "name": s.get("name") or ctx.cfg.scope_name(s["ip"]),
                  "firmware": s.get("firmware", "")}
                 for s in ctx.scopes
             ],
@@ -128,6 +128,9 @@ def create_app(ctx) -> Flask:
                   ctx.cfg.get("location.lon"), ctx.cfg.get("location.timezone"))
         ctx.cfg.update(incoming)
         ctx.cfg.save()
+        # Push credentials/base-url into seestarpy immediately so the next job
+        # doesn't fail with "credentials not set".
+        jobs_mod.apply_credentials(ctx.cfg)
         after = (ctx.cfg.get("scopes.count"), ctx.cfg.get("scopes.max_probe"),
                  ctx.cfg.get("location.source"), ctx.cfg.get("location.lat"),
                  ctx.cfg.get("location.lon"), ctx.cfg.get("location.timezone"))

@@ -28,9 +28,11 @@ DEFAULTS: dict[str, Any] = {
         "base_url": "https://crowdsky.univie.ac.at",
     },
     "scopes": {
-        "count": 0,        # 0 = auto-discover
-        "max_probe": 8,    # how far to probe when auto-discovering
-        "names": {},       # {ip: "friendly name"}
+        "count": 0,              # 0 = auto-discover
+        "max_probe": 8,          # how far to probe when auto-discovering
+        "discover_timeout": 5,   # mDNS resolve deadline per pass (seconds)
+        "discover_attempts": 3,  # discovery passes to union (mDNS is flaky)
+        "names": {},             # {ip: "friendly name"}
     },
     "location": {
         "source": "seestar",   # "seestar" | "manual"
