@@ -77,19 +77,31 @@ def format_scope_label(meta: dict, ip: str) -> str:
 
 
 def scope_metadata(ip: str) -> dict:
-    """Return ``{firmware, model, sn}`` for a scope (best-effort)."""
+    """Return device + storage metadata for a scope (best-effort).
+
+    Keys: ``firmware, model, sn, storage_used_pct, storage_free_mb,
+    storage_total_mb`` (storage values may be ``None`` if unavailable).
+    """
     from seestarpy import raw
+    meta = {
+        "firmware": "", "model": "", "sn": "",
+        "storage_used_pct": None, "storage_free_mb": None,
+        "storage_total_mb": None,
+    }
     try:
-        resp = raw.get_device_state(keys=["device"], ips=ip)
-        dev = (resp or {}).get("result", {}).get("device", {})
-        return {
-            "firmware": dev.get("firmware_ver_string", ""),
-            "model": dev.get("product_model", ""),
-            "sn": dev.get("sn", ""),
-        }
+        resp = raw.get_device_state(keys=["device", "storage"], ips=ip)
+        result = (resp or {}).get("result", {})
+        dev = result.get("device", {})
+        meta["firmware"] = dev.get("firmware_ver_string", "")
+        meta["model"] = dev.get("product_model", "")
+        meta["sn"] = dev.get("sn", "")
+        vol = (result.get("storage", {}).get("storage_volume") or [{}])[0]
+        meta["storage_used_pct"] = vol.get("used_percent")
+        meta["storage_free_mb"] = vol.get("free_mb")
+        meta["storage_total_mb"] = vol.get("total_mb")
     except Exception as exc:  # noqa: BLE001 - metadata is optional
         log.warning("Could not read device state from %s: %s", ip, exc)
-        return {"firmware": "", "model": "", "sn": ""}
+    return meta
 
 
 def read_location(cfg, scope_ips: list[str]) -> dict:

@@ -48,6 +48,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   padding: 0.6rem 0.8rem; margin-bottom: 0.8rem; display: grid; gap: 0.3rem;
 }
 #status-state { font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  font-size: 0.78rem; padding: 0.1rem 0.55rem; border-radius: 12px;
+  border: 1px solid var(--line); background: #12261a; color: #9fe0b0;
+}
+.chip.empty { background: #241a12; color: #d0a878; border-color: #3a2a1a; }
+tr.empty-scope td { color: var(--muted); font-style: italic; }
 #status-state.running { color: var(--amber); }
 #status-state.idle { color: var(--green); }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }

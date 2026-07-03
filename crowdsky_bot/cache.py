@@ -130,6 +130,13 @@ class Cache:
                 )
             self._conn.commit()
 
+    def count_targets_by_scope(self) -> dict[str, int]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT scope_ip, COUNT(*) AS n FROM targets GROUP BY scope_ip"
+            ).fetchall()
+        return {r["scope_ip"]: r["n"] for r in rows}
+
     def get_summary(self) -> list[dict]:
         with self._lock:
             rows = self._conn.execute(

@@ -49,12 +49,17 @@ def create_app(ctx) -> Flask:
     @app.get("/api/status")
     def api_status():
         prog = worker().progress.snapshot() if worker() else {"state": "idle"}
+        counts = ctx.cache.count_targets_by_scope()
         return jsonify({
             "progress": prog,
             "scopes": [
                 {"ip": s["ip"], "hostname": s.get("hostname"),
                  "name": s.get("name") or ctx.cfg.scope_name(s["ip"]),
-                 "firmware": s.get("firmware", "")}
+                 "firmware": s.get("firmware", ""),
+                 "storage_used_pct": s.get("storage_used_pct"),
+                 "storage_free_mb": s.get("storage_free_mb"),
+                 "storage_total_mb": s.get("storage_total_mb"),
+                 "target_count": counts.get(s["ip"], 0)}
                 for s in ctx.scopes
             ],
             "runs": ctx.cache.recent_runs(10),
@@ -171,7 +176,15 @@ def create_app(ctx) -> Flask:
             return Response(f"scope unreachable: {exc}", status=502)
         if upstream.status_code != 200:
             return Response("not found", status=upstream.status_code)
-        ctype = upstream.headers.get("Content-Type", "application/octet-stream")
+        ctype = upstream.headers.get("Content-Type", "")
+        if not ctype or ctype == "application/octet-stream":
+            low = p.lower()
+            if low.endswith((".jpg", ".jpeg")):
+                ctype = "image/jpeg"
+            elif low.endswith(".png"):
+                ctype = "image/png"
+            else:
+                ctype = "application/octet-stream"
 
         def generate():
             for chunk in upstream.iter_content(chunk_size=65536):

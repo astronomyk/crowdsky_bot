@@ -329,14 +329,33 @@ def _purge_summary(r: dict) -> dict:
 def list_gallery(ip: str, target: str) -> list[str]:
     """Return preview-image filenames for a target on a scope.
 
-    Prefers thumbnails (``_thn.jpg``); falls back to full-size JPEGs when a
-    folder has no thumbnails.
+    Lists the folder over **SMB** rather than the JSON-RPC file API: on current
+    firmware the RPC (``data.list_folder_contents``) only enumerates ``.fit``
+    files and never returns the ``.jpg`` / ``_thn.jpg`` previews, even though
+    they exist on disk. SMB sees every file. Prefers thumbnails, falls back to
+    full-size JPEGs, then PNGs.
     """
+    from smb.SMBConnection import SMBConnection
+
+    conn = SMBConnection("", "", "crowdsky-bot", "seestar",
+                         use_ntlm_v2=False, is_direct_tcp=True)
     try:
-        files = data.list_folder_contents(target, filetype="thn.jpg", ips=ip)
-        if not files:
-            files = data.list_folder_contents(target, filetype="jpg", ips=ip)
-        return sorted(files)
+        conn.connect(ip, 445)
+        entries = conn.listPath(data.SHARE_NAME, f"{data.ROOT_DIR}/{target}")
+        names = [e.filename for e in entries if not e.isDirectory]
     except Exception as exc:  # noqa: BLE001
-        log.warning("gallery listing failed for %s/%s: %s", ip, target, exc)
+        log.warning("gallery SMB listing failed for %s/%s: %s", ip, target, exc)
         return []
+    finally:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+
+    thumbs = sorted(n for n in names if n.endswith("_thn.jpg"))
+    if thumbs:
+        return thumbs
+    jpgs = sorted(n for n in names if n.lower().endswith(".jpg"))
+    if jpgs:
+        return jpgs
+    return sorted(n for n in names if n.lower().endswith(".png"))

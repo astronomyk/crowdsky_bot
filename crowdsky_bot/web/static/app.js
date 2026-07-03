@@ -45,8 +45,22 @@ function renderStatus(s) {
     ? `Last: ${lr.kind} ${lr.status} at ${fmt(lr.finished_at)}`
     : "";
 
-  // populate gallery scope/target dropdown from scopes list once
+  // Scope overview: every discovered scope, with storage % and target count,
+  // so a scanned-but-empty scope is visible rather than silently missing.
   window.CROWDSKY.scopes = s.scopes || [];
+  $("scope-overview").innerHTML = (s.scopes || [])
+    .map((sc) => {
+      const used = sc.storage_used_pct == null ? "?" : `${sc.storage_used_pct}%`;
+      const tc = sc.target_count;
+      const empty = tc === 0;
+      const cls = empty ? "chip empty" : "chip";
+      return `<span class="${cls}" title="${esc(sc.ip)}">${esc(
+        sc.name
+      )} · fw ${esc(sc.firmware || "?")} · ${used} used · ${tc} target${
+        tc === 1 ? "" : "s"
+      }</span>`;
+    })
+    .join("");
 }
 
 function fmt(iso) {
@@ -73,20 +87,35 @@ function pill(n, kind) {
 function renderSummary(data) {
   SUMMARY_ROWS = data.rows || [];
   const body = $("summary-body");
-  if (!SUMMARY_ROWS.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">No targets yet — Refresh to scan.</td></tr>`;
-  } else {
-    body.innerHTML = SUMMARY_ROWS.map(
-      (r, i) => `<tr>
-        <td><input type="checkbox" class="rowchk" data-i="${i}"></td>
-        <td>${esc(r.name || r.hostname || r.scope_ip)}</td>
-        <td>${esc(r.target)}</td>
-        <td class="num">${pill(r.on_server, "have")}</td>
-        <td class="num">${pill(r.awaiting_upload, "pending")}</td>
-        <td class="num">${pill(r.awaiting_stacking, "pending")}</td>
-      </tr>`
-    ).join("");
+  let html = SUMMARY_ROWS.map(
+    (r, i) => `<tr>
+      <td><input type="checkbox" class="rowchk" data-i="${i}"></td>
+      <td>${esc(r.name || r.hostname || r.scope_ip)}</td>
+      <td>${esc(r.target)}</td>
+      <td class="num">${pill(r.on_server, "have")}</td>
+      <td class="num">${pill(r.awaiting_upload, "pending")}</td>
+      <td class="num">${pill(r.awaiting_stacking, "pending")}</td>
+    </tr>`
+  ).join("");
+
+  // Show every discovered scope that produced no target rows, so an
+  // empty/offline scope is visible instead of silently vanishing.
+  const present = new Set(SUMMARY_ROWS.map((r) => r.scope_ip));
+  (window.CROWDSKY.scopes || [])
+    .filter((sc) => !present.has(sc.ip))
+    .forEach((sc) => {
+      const used = sc.storage_used_pct == null ? "?" : `${sc.storage_used_pct}%`;
+      html += `<tr class="empty-scope">
+        <td></td>
+        <td>${esc(sc.name)}</td>
+        <td colspan="4" class="muted">no targets on this scope (storage ${used} used)</td>
+      </tr>`;
+    });
+
+  if (!html) {
+    html = `<tr><td colspan="6" class="muted">No targets yet — Refresh to scan.</td></tr>`;
   }
+  body.innerHTML = html;
   $("last-refreshed").textContent = fmt(data.last_refreshed);
 
   // gallery target dropdown = unique (scope,target)
