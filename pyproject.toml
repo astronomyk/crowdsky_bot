@@ -1,0 +1,33 @@
+[project]
+name = "crowdsky-bot"
+version = "0.1.0"
+description = "Auto stack-and-upload appliance that contributes Seestar frames to CrowdSky"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Kieran Leschinski" }]
+dependencies = [
+    "seestarpy>=0.5.0",
+    "flask>=3.0",
+    "waitress>=3.0",
+    "astral>=3.2",
+    "tomli-w>=1.0",
+]
+
+[project.scripts]
+crowdsky-bot = "crowdsky_bot.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["crowdsky_bot"]
+
+# Pinned so `uv sync` on the Pi (armv6) keeps pulling prebuilt ARM wheels
+# instead of falling back to a source build. See SEESTARPY_SETUP.md.
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
+[[tool.uv.index]]
+name = "piwheels"
+url = "https://www.piwheels.org/simple"
